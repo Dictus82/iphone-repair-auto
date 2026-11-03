@@ -10,10 +10,11 @@ kind = "info"
 # privacy_masked = true      # 잠금화면·전화번호·IMEI·얼굴·이름 가림
 
 # 한국 시간. 예: "2026-11-10 19:00"
-scheduled_at = ""
+scheduled_at = "2026-11-05 19:00"
 
 # 사장님이 이미지와 캡션을 확인한 뒤에만 true로 바꿉니다.
-approved = false
+# 2026-11-03 사장님 승인 (대화로 요청)
+approved = true
 
 media = ["01.jpg", "02.jpg", "03.jpg", "04.jpg"]
 caption_file = "caption.txt"
