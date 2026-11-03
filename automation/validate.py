@@ -185,6 +185,26 @@ def validate_post(post: Post):
         if len(ratios) > 1:
             warnings.append("이미지 비율이 서로 다름 - 첫 장 비율로 잘림")
 
+    # 정보형 릴스 출처 기록 검사 (make_stock_reel.py가 만드는 credits.json)
+    credits_path = post.folder / "credits.json"
+    if credits_path.exists():
+        import json
+        info = json.loads(credits_path.read_text(encoding="utf-8"))
+        facts = info.get("facts", [])
+        if not facts:
+            errors.append("credits.json: 사실 확인 출처(facts)가 없음")
+        for f in facts:
+            if not f.get("url") or not f.get("checked"):
+                errors.append(f"출처 URL·확인 날짜 누락: {f.get('claim', '')[:30]}")
+            if f.get("source_type") not in ("공식", "언론"):
+                errors.append(f"확인되지 않은 출처 유형({f.get('source_type')})은 제작 제외: "
+                              f"{f.get('claim', '')[:30]}")
+        for s in info.get("stock", []):
+            if not all(s.get(k) for k in ("page_url", "author", "license_url", "terms_checked")):
+                errors.append(f"스톡 영상 권리 기록 누락: {s.get('id')}")
+        if not info.get("selection"):
+            warnings.append("주제 선정 근거(selection)가 없음")
+
     if not post.caption_path.exists():
         errors.append(f"캡션 파일 없음: {post.caption_path.name}")
     else:
