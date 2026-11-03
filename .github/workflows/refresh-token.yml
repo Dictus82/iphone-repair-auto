@@ -4,9 +4,9 @@
 name: 토큰 갱신
 
 on:
-  # 예약 실행은 아직 꺼져 있습니다. 토큰을 저장한 뒤 아래 두 줄의 # 을 지웁니다.
-  # schedule:
-  #   - cron: "13 1 * * 1"
+  # 예약 실행 켜짐 (2026-11-03). Unified login(IG_LOGIN_TYPE=unified)이면 안내만 출력하고 갱신하지 않습니다.
+  schedule:
+    - cron: "13 1 * * 1"
   workflow_dispatch:
 
 permissions:
