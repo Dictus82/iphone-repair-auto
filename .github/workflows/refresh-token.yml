@@ -1,0 +1,42 @@
+# Instagram 토큰 갱신: 매주 월요일 10:13 (KST) 실행. 토큰은 60일 유효, 갱신하면 다시 60일.
+# 새 토큰을 Secret에 자동 저장하려면 GH_SECRETS_TOKEN(이 저장소 Secrets 쓰기 권한) 이 필요합니다.
+# 없으면 갱신만 하고, 토큰 값이 바뀐 경우 실패로 표시해 메일 알림이 가게 합니다.
+name: 토큰 갱신
+
+on:
+  # 예약 실행은 아직 꺼져 있습니다. 토큰을 저장한 뒤 아래 두 줄의 # 을 지웁니다.
+  # schedule:
+  #   - cron: "13 1 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: 토큰 갱신
+        env:
+          IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+        run: python automation/refresh_token.py "$RUNNER_TEMP/new_token"
+      - name: Secret 저장
+        env:
+          GH_TOKEN: ${{ secrets.GH_SECRETS_TOKEN }}
+          OLD_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+        run: |
+          NEW="$RUNNER_TEMP/new_token"
+          if [ "$(cat "$NEW")" = "$OLD_TOKEN" ]; then
+            echo "토큰 값이 같아 Secret 변경 불필요"
+          elif [ -n "$GH_TOKEN" ]; then
+            gh secret set IG_ACCESS_TOKEN --repo "$GITHUB_REPOSITORY" < "$NEW"
+            echo "새 토큰을 Secret에 저장했습니다"
+          else
+            echo "::error::토큰 값이 바뀌었지만 GH_SECRETS_TOKEN이 없어 저장하지 못했습니다. 안내서 6단계를 진행하세요."
+            rm -f "$NEW"; exit 1
+          fi
+          rm -f "$NEW"

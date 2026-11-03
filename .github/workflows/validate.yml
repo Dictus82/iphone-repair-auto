@@ -1,0 +1,22 @@
+# 게시물 검사: 게시물을 올리거나 수정할 때마다 형식·이미지·표현 규칙을 검사합니다.
+name: 게시물 검사
+
+on:
+  push:
+    paths: ["content/posts/**", "automation/**"]
+  pull_request:
+    paths: ["content/posts/**", "automation/**"]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pillow
+      - run: python automation/validate.py

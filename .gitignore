@@ -1,0 +1,18 @@
+# 공개 저장소에는 아래 허용 목록에 있는 것만 올립니다 (그 외 모든 파일 제외).
+# 제외되는 예: CLAUDE.md, store-profile.md, .claude/(스킬·설정), scripts/, outputs/(작업물), photos/(원본 사진)
+/*
+!/.gitignore
+!/.github/
+!/automation/
+!/content/
+!/docs/
+
+# 허용 폴더 안에서도 비밀 정보와 캐시는 제외 (토큰은 GitHub Secrets 에만)
+.env
+.env.*
+*.token
+*.key
+*.pem
+new_token
+__pycache__/
+*.pyc
