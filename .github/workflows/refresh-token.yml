@@ -20,11 +20,16 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Unified login 안내
+        if: vars.IG_LOGIN_TYPE == 'unified'
+        run: echo "Unified login 토큰은 이 방식으로 갱신하지 않습니다. 만료 설정은 Meta 앱의 로그인 구성에서 정해지며, 만료되면 다시 연결합니다."
       - name: 토큰 갱신
+        if: vars.IG_LOGIN_TYPE != 'unified'
         env:
           IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
         run: python automation/refresh_token.py "$RUNNER_TEMP/new_token"
       - name: Secret 저장
+        if: vars.IG_LOGIN_TYPE != 'unified'
         env:
           GH_TOKEN: ${{ secrets.GH_SECRETS_TOKEN }}
           OLD_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}

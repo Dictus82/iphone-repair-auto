@@ -1,0 +1,24 @@
+# 연결 확인 (읽기 전용, 게시하지 않음). Actions 화면에서 수동으로만 실행합니다.
+name: 연결 확인
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: 연결 확인
+        working-directory: automation
+        env:
+          IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+          IG_LOGIN_TYPE: ${{ vars.IG_LOGIN_TYPE }}
+          IG_USER_ID: ${{ vars.IG_USER_ID }}
+        run: python check_connection.py

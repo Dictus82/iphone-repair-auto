@@ -14,7 +14,8 @@
 
 필요한 환경 변수 (실제 게시 때만, GitHub Secrets에 저장 - 파일·대화에 쓰지 않음)
   IG_ACCESS_TOKEN  Instagram 장기 액세스 토큰
-  IG_USER_ID       (선택) Instagram 계정 ID. 없으면 "me"
+  IG_LOGIN_TYPE    unified(Unified login 토큰) 또는 instagram(기본)
+  IG_USER_ID       Instagram 계정 ID. unified는 필수, instagram은 없으면 "me"
   IG_API_VERSION   (선택) 기본 v26.0
   MEDIA_BASE_URL   (선택) 이미지 공개 주소. 없으면 GitHub raw 주소 사용
 """
@@ -42,13 +43,27 @@ class ApiError(Exception):
 
 
 class Instagram:
-    def __init__(self):
+    """IG_LOGIN_TYPE
+    - unified   : Unified login (시스템 사용자 토큰) → graph.facebook.com, IG_USER_ID 필수
+                  (이 토큰에서 'me'는 인스타 계정이 아니라 시스템 사용자를 뜻함)
+    - instagram : Instagram 로그인 토큰 → graph.instagram.com, IG_USER_ID 없으면 'me'
+    """
+
+    def __init__(self, require_user=True):
         self.token = os.environ.get("IG_ACCESS_TOKEN", "")
         if not self.token:
             raise SystemExit("IG_ACCESS_TOKEN이 없습니다 (GitHub Secrets 설정 필요)")
-        self.user = os.environ.get("IG_USER_ID") or "me"
+        self.login = (os.environ.get("IG_LOGIN_TYPE") or "instagram").strip().lower()
+        if self.login not in ("unified", "instagram"):
+            raise SystemExit("IG_LOGIN_TYPE은 unified 또는 instagram")
         version = os.environ.get("IG_API_VERSION") or "v26.0"
-        self.base = f"https://graph.instagram.com/{version}"
+        host = "graph.facebook.com" if self.login == "unified" else "graph.instagram.com"
+        self.base = f"https://{host}/{version}"
+        self.user = (os.environ.get("IG_USER_ID") or "").strip()
+        if not self.user:
+            if self.login == "unified" and require_user:
+                raise SystemExit("Unified login은 IG_USER_ID가 필요합니다 ('연결 확인' 실행으로 확인)")
+            self.user = "me" if self.login == "instagram" else ""
 
     def call(self, method, path, **params):
         params["access_token"] = self.token

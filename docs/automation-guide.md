@@ -113,6 +113,10 @@ automation/           게시 프로그램 (사업 정보 없음)
    - Name: `IG_ACCESS_TOKEN` / Secret: 복사한 토큰 붙여넣기 → **Add secret**
 3. **Variables** 탭 → **New repository variable**
    - Name: `PUBLISH_ENABLED` / Value: `false` (실제 게시는 아직 꺼둠)
+   - Name: `IG_LOGIN_TYPE` / Value: `unified` (Unified login 토큰) 또는 `instagram` (Instagram 로그인 토큰)
+4. **Actions → 연결 확인 → Run workflow** (읽기 전용) → 로그에 나온 dictus820의 계정 ID를
+   Variables에 `IG_USER_ID`로 등록 → 한 번 더 실행해 "게시 권한 확인됨" 확인
+- Unified login 토큰은 만료 여부가 Meta 앱의 로그인 구성에서 정해집니다. 6단계 자동 갱신은 instagram 방식에만 해당합니다.
 
 ### 6단계. 토큰 자동 갱신 권한 (권장)
 토큰은 60일마다 만료되므로 매주 자동 갱신합니다. 새 토큰을 자동 저장하려면:
