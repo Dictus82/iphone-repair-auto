@@ -4,6 +4,8 @@
 오류가 있으면 종료 코드 1.
 """
 import re
+import shutil
+import subprocess
 import sys
 
 from common import ID_RE, Post, load_posts
@@ -14,7 +16,11 @@ HASHTAG_MAX = 30
 CAROUSEL_MIN, CAROUSEL_MAX = 2, 20
 IMAGE_MAX_BYTES = 8 * 1024 * 1024
 RATIO_MIN, RATIO_MAX = 4 / 5, 1.91      # 세로 4:5 ~ 가로 1.91:1
-SUPPORTED_TYPES = ("image", "carousel")  # 영상(reel)은 별도 연결 단계에서 추가
+SUPPORTED_TYPES = ("image", "carousel", "reel")
+# 릴스 (Instagram 공식 규격): MP4/MOV, H.264/HEVC, 23~60fps, 가로 1920px 이하, 3초~15분, 300MB 이하
+REEL_MIN_SEC, REEL_MAX_SEC = 3, 15 * 60
+REEL_MAX_BYTES = 300 * 1024 * 1024
+GIT_MAX_BYTES = 95 * 1024 * 1024        # GitHub는 100MB 넘는 파일을 받지 않음
 
 # CLAUDE.md 수리 콘텐츠 규칙: 사실 확인 전 쓰지 않는 표현.
 # 확인된 표현은 post.toml의 confirmed_terms에 넣어야 통과합니다.
@@ -41,6 +47,80 @@ def check_image(path, errors, warnings):
     if w > 1440:
         warnings.append(f"{path.name}: 너비 {w}px - 인스타가 1440px로 줄임")
     return round(ratio, 3)
+
+
+def ffmpeg_exe():
+    exe = shutil.which("ffmpeg")
+    if exe:
+        return exe
+    try:
+        import imageio_ffmpeg
+        return imageio_ffmpeg.get_ffmpeg_exe()
+    except ImportError:
+        return None
+
+
+def moov_before_mdat(path):
+    """MP4의 moov(재생 정보)가 영상 데이터보다 앞에 있는지 (Instagram 요구사항)."""
+    with open(path, "rb") as f:
+        while True:
+            head = f.read(8)
+            if len(head) < 8:
+                return False
+            size = int.from_bytes(head[:4], "big")
+            kind = head[4:8]
+            if kind == b"moov":
+                return True
+            if kind == b"mdat":
+                return False
+            if size == 1:
+                size = int.from_bytes(f.read(8), "big")
+                f.seek(size - 16, 1)
+            elif size < 8:
+                return False
+            else:
+                f.seek(size - 8, 1)
+
+
+def check_video(path, errors, warnings):
+    size = path.stat().st_size
+    if path.suffix.lower() not in (".mp4", ".mov"):
+        errors.append(f"{path.name}: MP4 또는 MOV만 가능")
+    if size > REEL_MAX_BYTES:
+        errors.append(f"{path.name}: 300MB 초과")
+    if size > GIT_MAX_BYTES:
+        errors.append(f"{path.name}: 95MB 초과 - GitHub에 올릴 수 없음")
+    if not moov_before_mdat(path):
+        errors.append(f"{path.name}: 빠른 시작(faststart) 형식이 아님 - make_reel.py로 다시 만드세요")
+
+    exe = ffmpeg_exe()
+    if not exe:
+        warnings.append("ffmpeg가 없어 영상 길이·코덱 검사를 건너뜀")
+        return
+    info = subprocess.run([exe, "-hide_banner", "-i", str(path)],
+                          capture_output=True, text=True, encoding="utf-8",
+                          errors="replace").stderr
+    m = re.search(r"Duration: (\d+):(\d+):([\d.]+)", info)
+    if m:
+        sec = int(m[1]) * 3600 + int(m[2]) * 60 + float(m[3])
+        if not (REEL_MIN_SEC <= sec <= REEL_MAX_SEC):
+            errors.append(f"{path.name}: 길이 {sec:.1f}초 - 3초~15분만 가능")
+    v = re.search(r"Video: (\w+).*?, (\d{2,5})x(\d{2,5}).*?([\d.]+) fps", info)
+    if not v:
+        errors.append(f"{path.name}: 영상 정보를 읽지 못함")
+        return
+    codec, w, h, fps = v[1], int(v[2]), int(v[3]), float(v[4])
+    if codec not in ("h264", "hevc"):
+        errors.append(f"{path.name}: 코덱 {codec} - H.264 또는 HEVC만 가능")
+    if w > 1920:
+        errors.append(f"{path.name}: 가로 {w}px - 최대 1920px")
+    if not (23 <= fps <= 60):
+        errors.append(f"{path.name}: {fps}fps - 23~60fps만 가능")
+    if abs(w / h - 9 / 16) > 0.02:
+        warnings.append(f"{path.name}: {w}x{h}는 9:16이 아님 - 위아래나 양옆이 잘리거나 빈 공간이 생길 수 있음")
+    a = re.search(r"Audio: (\w+), (\d+) Hz", info)
+    if a and (a[1] != "aac" or int(a[2]) > 48000):
+        errors.append(f"{path.name}: 오디오 {a[1]} {a[2]}Hz - AAC 48kHz 이하만 가능")
 
 
 def validate_post(post: Post):
@@ -76,16 +156,34 @@ def validate_post(post: Post):
         errors.append("type = \"image\"는 이미지 1장")
     if post.type == "carousel" and not (CAROUSEL_MIN <= len(media) <= CAROUSEL_MAX):
         errors.append(f"carousel은 이미지 {CAROUSEL_MIN}~{CAROUSEL_MAX}장")
-    ratios = set()
-    for p in media:
-        if not p.exists():
-            errors.append(f"이미지 없음: {p.name}")
-            continue
-        r = check_image(p, errors, warnings)
-        if r:
-            ratios.add(r)
-    if len(ratios) > 1:
-        warnings.append("이미지 비율이 서로 다름 - 첫 장 비율로 잘림")
+    if post.type == "reel":
+        if len(media) != 1:
+            errors.append("type = \"reel\"은 영상 파일 1개")
+        elif not media[0].exists():
+            errors.append(f"영상 없음: {media[0].name}")
+        else:
+            check_video(media[0], errors, warnings)
+        cover = m.get("cover")
+        if cover:
+            cp = post.folder / cover
+            if not cp.exists():
+                errors.append(f"표지 이미지 없음: {cover}")
+            else:
+                with_ratio_errors = []
+                check_image(cp, with_ratio_errors, warnings)
+                # 표지는 9:16이라 피드 비율 오류는 무시하고 형식·용량만 확인
+                errors.extend(e for e in with_ratio_errors if "비율" not in e)
+    else:
+        ratios = set()
+        for p in media:
+            if not p.exists():
+                errors.append(f"이미지 없음: {p.name}")
+                continue
+            r = check_image(p, errors, warnings)
+            if r:
+                ratios.add(r)
+        if len(ratios) > 1:
+            warnings.append("이미지 비율이 서로 다름 - 첫 장 비율로 잘림")
 
     if not post.caption_path.exists():
         errors.append(f"캡션 파일 없음: {post.caption_path.name}")

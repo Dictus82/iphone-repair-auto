@@ -36,6 +36,7 @@ from validate import validate_post
 LATE_LIMIT_HOURS = 3      # 예약 시간보다 3시간 넘게 늦으면 올리지 않음
 MAX_POSTS_PER_RUN = 3
 POLL_SECONDS, POLL_TRIES = 15, 20   # 컨테이너 준비 확인 (최대 약 5분)
+REEL_POLL_TRIES = 48                # 영상은 처리 시간이 길어 최대 약 12분
 
 
 class ApiError(Exception):
@@ -90,8 +91,8 @@ class Instagram:
     def create(self, **params):
         return self.call("POST", f"{self.user}/media", **params)["id"]
 
-    def wait_ready(self, container_id):
-        for _ in range(POLL_TRIES):
+    def wait_ready(self, container_id, tries=POLL_TRIES):
+        for _ in range(tries):
             code = self.call("GET", container_id, fields="status_code").get("status_code")
             if code == "FINISHED":
                 return
@@ -110,15 +111,18 @@ class Instagram:
             return ""
 
 
-def media_urls(post):
+def file_url(post, name):
     base = os.environ.get("MEDIA_BASE_URL")
     if not base:
         repo, sha = os.environ.get("GITHUB_REPOSITORY"), os.environ.get("GITHUB_SHA")
         if not (repo and sha):
             raise SystemExit("이미지 공개 주소를 만들 수 없습니다 (GitHub Actions 밖에서 실행됨)")
         base = f"https://raw.githubusercontent.com/{repo}/{sha}"
-    return [f"{base.rstrip('/')}/content/posts/{post.id}/{urllib.parse.quote(p.name)}"
-            for p in post.media]
+    return f"{base.rstrip('/')}/content/posts/{post.id}/{urllib.parse.quote(name)}"
+
+
+def media_urls(post):
+    return [file_url(post, p.name) for p in post.media]
 
 
 def git_save(post, message):
@@ -135,8 +139,16 @@ def git_save(post, message):
 def publish_post(ig, post, commit):
     urls = media_urls(post)
     caption = post.caption
+    tries = POLL_TRIES
     if post.type == "image":
         container = ig.create(image_url=urls[0], caption=caption)
+    elif post.type == "reel":
+        params = {"media_type": "REELS", "video_url": urls[0], "caption": caption,
+                  "share_to_feed": "true" if post.meta.get("share_to_feed", True) else "false"}
+        if post.meta.get("cover"):
+            params["cover_url"] = file_url(post, post.meta["cover"])
+        container = ig.create(**params)
+        tries = REEL_POLL_TRIES
     else:
         children = []
         for u in urls:
@@ -145,7 +157,7 @@ def publish_post(ig, post, commit):
             children.append(cid)
         container = ig.create(media_type="CAROUSEL", children=",".join(children),
                               caption=caption)
-    ig.wait_ready(container)
+    ig.wait_ready(container, tries)
 
     # 게시 직전 상태를 먼저 기록 → 기록이 안 되면 게시하지 않음 (중복 게시 방지)
     started = fmt_kst(now_kst())

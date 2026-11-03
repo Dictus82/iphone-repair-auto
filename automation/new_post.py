@@ -18,7 +18,7 @@ from common import ID_RE, POSTS_DIR
 TEMPLATE = '''# 게시물 정보 - 사람이 수정하는 파일입니다.
 title = "{title}"
 
-# image(1장) 또는 carousel(2~20장). 영상(reel)은 별도 연결 단계에서 추가합니다.
+# image(1장) 또는 carousel(2~20장). 영상(릴스)은 make_reel.py로 만듭니다.
 type = "{type}"
 
 # info = 정보형, case = 실제 수리 사례 (case는 아래 두 확인 항목이 true여야 게시됨)

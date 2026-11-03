@@ -52,13 +52,39 @@ automation/           게시 프로그램 (사업 정보 없음)
   → 사실로 확인되면 `confirmed_terms`에 넣어야 통과
 - 실제 수리 사례(`kind = "case"`): 고객 동의·개인정보 가림 확인 항목이 `true`여야 통과
 
+## 릴스(세로 영상) 만들기
+
+사진 + 짧은 문구로 1080×1920 세로 영상을 만들고, **미승인 초안**으로 등록합니다. 무료 도구(imageio-ffmpeg)만 사용합니다.
+
+1. 작업 폴더(예: `outputs/reels/<이름>/`)에 사진, `caption.txt`, `reel.toml`을 둡니다.
+   - 실제 수리 사례는 **사장님이 찍고 개인정보를 가린 사진만** 사용합니다. 원본 사진은 `photos/`에 두며 저장소에 올라가지 않습니다.
+2. `reel.toml` 예시
+   ```toml
+   title = "액정 교체 사례 릴스"
+   kind = "case"            # 정보형이면 "info"
+   fit = "cover"            # 사진을 화면 가득 / 카드 이미지는 "contain"
+   seconds = 3.0
+   [[slides]]
+   image = "01.jpg"
+   text = "수리 전"         # 사장님이 확인한 문구만
+   [[slides]]
+   image = "02.jpg"
+   text = "수리 후"
+   ```
+3. `python automation/make_reel.py <게시물ID> --spec outputs/reels/<이름>/reel.toml`
+   → `content/posts/<게시물ID>/`에 `reel.mp4`, `cover.jpg`(표지), `caption.txt`, `post.toml`(미승인) 생성
+4. 영상 확인 후 사진 게시물과 똑같이 `scheduled_at`, `approved = true`로 승인합니다.
+   - `kind = "case"`는 `consent_confirmed`, `privacy_masked`도 `true`여야 게시됩니다.
+
+릴스 자동 검사: MP4, H.264, 23~60fps, 3초~15분, 가로 1920px 이하, AAC 48kHz, 빠른 시작 형식, 95MB 이하(GitHub 제한)
+
 ## 단계별 진행
 
 | 단계 | 내용 | 상태 |
 |---|---|---|
 | 1 | 승인 → 예약 자동 게시 (사진 카드뉴스) | 코드 완성, 계정 연결 전 |
 | 2 | 실제 사진 사용 (사장님이 찍고 가린 사진만) | 연결 전 |
-| 3 | 영상(릴스) 제작·게시 | 연결 전 (제작 도구 선택 필요) |
+| 3 | 영상(릴스) 제작·게시 | 사진+문구 세로 영상 완성 (무료 도구), 첫 릴스 게시 전 |
 | 4 | 주제 선정·제작도 클라우드에서 | 연결 전 (비용 확인 후 결정) |
 
 - 실제 수리 사례와 사진은 사장님이 제공한 것만 씁니다. AI로 수리 전후 사진을 만들지 않습니다.

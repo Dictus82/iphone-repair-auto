@@ -1,0 +1,24 @@
+# 게시물 정보 - 사람이 수정하는 파일입니다.
+title = "배터리 교체 정보형 릴스"
+
+# reel = 세로 영상(릴스). 영상은 make_reel.py로 만듭니다.
+type = "reel"
+
+# info = 정보형, case = 실제 수리 사례 (case는 아래 두 확인 항목이 true여야 게시됨)
+kind = "info"
+# consent_confirmed = true   # 고객 동의 받음
+# privacy_masked = true      # 개인정보 가림
+
+# 한국 시간. 예: "2026-11-10 19:00"
+scheduled_at = ""
+
+# 사장님이 영상과 캡션을 확인한 뒤에만 true로 바꿉니다.
+approved = false
+
+media = ["reel.mp4"]
+cover = "cover.jpg"          # 릴스 탭 표지 (9:16 JPEG)
+share_to_feed = true         # true: 피드와 릴스 탭 모두 / false: 릴스 탭만
+caption_file = "caption.txt"
+
+# 사실로 확인된 표현만 넣습니다. 예: ["정품"]
+confirmed_terms = []
